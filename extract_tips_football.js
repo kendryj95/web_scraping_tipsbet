@@ -3,11 +3,20 @@ const cheerio = require("cheerio");
 const fs = require("fs");
 const moment = require('moment');
 const { exit } = require("process");
+const { replaceWith } = require("cheerio/lib/api/manipulation");
+const { error } = require("console");
 
 
 const DATE = process.env.DATE || moment().format("YYYY-MM-DD")
 
 console.log("DATE >>>>", DATE);
+
+const bet = 20000;
+
+let money = {
+    gain: 0,
+    lost: 0
+}
 
 // function to get the raw data
 const getRawData = (URL) => {
@@ -74,6 +83,9 @@ const scrapeData = async () => {
     if (competitions.length > 0) {
         console.log("# --- Date --- Team1 --- Team2 --- Tip --- % Tip --- Result");
         let n = 0;
+        let group = 0;
+        let cuota = 0;
+        let lost = 0;
         for (let i = 0; i < competitions.length; i++) {
 
             const tip = competitions[i].children[2].children[1].children[1].children[0].children[0].data;
@@ -84,14 +96,15 @@ const scrapeData = async () => {
 
                 let percentTip = 0;
                 if (tipTeam1 >= 59 || tipTeam2 >= 59) {
+                    group++;
                     const rawData = await getRawWithBodyData(URL_MATCH_INFO_BET, matchId);
 
                     // parsing the data
                     const parsedData = cheerio.load(rawData);
 
                     const infoBet = parsedData("div.halfcontainer");
-                    const betTeam1 = infoBet[0].children[0].children[1].children[0].children[0].data;
-                    const betTeam2 = infoBet[0].children[0].children[3].children[0].children[0].data;
+                    let betTeam1 = infoBet[0].children[0].children[1].children[0].children[0].data;
+                    let betTeam2 = infoBet[0].children[0].children[3].children[0].children[0].data;
 
                     n++;
 
@@ -113,9 +126,81 @@ const scrapeData = async () => {
                     if (classResultTip.indexOf("success") >= 0) {
                         resultTip = "YES";
                         countTypeResult.yes += 1;
+                        betTeam1 = betTeam1.replace('\\','');
+                        betTeam2 = betTeam2.replace('\\','');
+                        if (tip == '1' && (betTeam1 != 'na')) {
+                            if (group == 1) {
+                                cuota = parseFloat(betTeam1);
+                            } else {
+                                if (lost == 0) {
+                                    cuota = cuota * parseFloat(betTeam1);
+                                    const gain = (bet * (cuota - 1));
+                                    if (gain > 0) {
+                                        money.gain += gain;
+                                        console.log("Ganancia", gain);
+                                    }
+                                } else {
+                                    console.error("PERDIDA");
+                                }
+                                lost = 0;
+                                group = 0;
+                                cuota = 0;
+                            }
+                        } else if (tip == '2' && (betTeam2 != 'na')) {
+                            if (group == 1) {
+                                cuota = parseFloat(betTeam2);
+                            } else {
+                                if (lost == 0) {
+                                    cuota = cuota * parseFloat(betTeam2);
+                                    const gain = (bet * (cuota - 1));
+                                    if (gain > 0) {
+                                        money.gain += gain;
+                                        console.log("Ganancia", gain);
+                                    }
+                                } else {
+                                    console.error("PERDIDA");
+                                }
+                                lost = 0;
+                                group = 0;
+                                cuota = 0;
+                            }
+                        } else if ((betTeam1 == 'na' || betTeam2 == 'na')) {
+                            if (group == 1) {
+                                cuota = 1.15;
+                            } else {
+                                if (lost == 0) {
+                                    cuota = cuota * 1.15;
+                                    const gain = (bet * (cuota - 1));
+                                    if (gain > 0) {
+                                        money.gain += gain;
+                                        console.log("Ganancia", gain);
+                                    }
+                                } else {
+                                    console.error("PERDIDA");
+                                }
+                                lost = 0;
+                                group = 0;
+                                cuota = 0;
+                            }
+                        }
                     } else if (classResultTip.indexOf("failed") >= 0) {
                         resultTip = "NO";
                         countTypeResult.no += 1;
+                        
+                        if (group == 1) {
+                            lost = bet;
+                            money.lost += lost;
+                            console.error("SUMANDO PERDIDA >>", lost);
+                        } else {
+                            let lost2 = lost > 0 ? 0 : bet;
+                            money.lost += lost2;
+                            console.error("VALOR DE LOST >>>", lost);
+                            console.error("SUMANDO PERDIDA >>", lost2);
+                            group = 0;
+                            cuota = 0;
+                            lost = 0;
+                            console.error("PERDIDA");
+                        }
                     } else {
                         countTypeResult.na += 1;
                     }
@@ -135,7 +220,7 @@ const scrapeData = async () => {
             console.log("\nEstadísticas de tips:");
             console.log(`    acertados = ${countTypeResult.yes}, perdidos = ${countTypeResult.no}, no iniciados = ${countTypeResult.na}`);
             console.log("Porcentajes de tips:");
-            console.log(`    Mínimo = ${mathArray.min(percentages)}, Máximo = ${mathArray.max(percentages)}, Media = ${mathArray.avg(percentages)}, Acierto = ${success}`);
+            console.log(`    Mínimo = ${mathArray.min(percentages)}, Máximo = ${mathArray.max(percentages)}, Media = ${mathArray.avg(percentages)}, Acierto = ${success}, Ganancias = ${money.gain}, Perdidas = ${money.lost}`);
             console.log("---------------------------------------------------------------");
         } else {
             console.log("----------- NO EXISTEN JUEGOS CON ALTAS PROBABILIDADES -----------");
