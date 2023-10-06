@@ -48,7 +48,7 @@ const getRawData = (URL) => {
         });
 };
 
-const getRawWithBodyData = (URL, matchid) => {
+const getRawWithBodyData = async (URL, matchid) => {
     return fetch(URL,{
         "headers": {
             "content-type": "application/x-www-form-urlencoded; charset=UTF-8"
@@ -139,8 +139,8 @@ const scrapeData = async () => {
                         const parsedData = cheerio.load(rawData);
 
                         const infoBet = parsedData("div.halfcontainer");
-                        const betTeam1 = infoBet[0].children[0].children[1].children[0].children[0].data;
-                        const betTeam2 = infoBet[0].children[0].children[3].children[0].children[0].data;
+                        const betTeam1 = infoBet.length > 0 ? infoBet[0].children[0].children[1].children[0].children[0].data : 'n/a';
+                        const betTeam2 = infoBet.length > 0 ? infoBet[0].children[0].children[3].children[0].children[0].data : 'n/a';
 
                         n++;
 
