@@ -6,6 +6,7 @@ const xl = require('excel4node');
 const path = require('path');
 
 const DATE = process.env.DATE || moment().format("YYYY-MM-DD")
+let today = DATE + '---' + moment().format('YYYY-MM-DD-H-mm-ss');
 
 console.log("DATE >>>>", DATE);
 
@@ -16,7 +17,7 @@ const cualColumnaEstilo = wb.createStyle({
     font: {
         name: 'Arial',
         color: '#000000',
-        size: 12,
+        size: 10,
         bold: true,
     }
 });
@@ -25,7 +26,16 @@ const contenidoEstilo = wb.createStyle({
     font: {
         name: 'Arial',
         color: '#494949',
-        size: 11,
+        size: 9,
+    }
+});
+
+const contenidoEstiloTip = wb.createStyle({
+    font: {
+        name: 'Arial',
+        color: '#AD1F00',
+        size: 9,
+        bold: true
     }
 });
 
@@ -80,7 +90,8 @@ const scrapeData = async () => {
     // parsing the data
     const parsedData = cheerio.load(rawData);
 
-    const competitions = parsedData("div.competition .body .match");
+    // const competitions = parsedData("div.competition .body .match");
+    const competitions = parsedData('div.competition[id^="0"]');
 
     const countTypeResult = {
         yes: 0,
@@ -93,16 +104,16 @@ const scrapeData = async () => {
     const percentages = [];
     if (competitions.length > 0) {
 
-        let nombreArchivo = "juegos";
+        let nombreArchivo = "tips-"+today;
         let ws = wb.addWorksheet(nombreArchivo);
         let lineData = 2;
 
         //Nombres de las columnas
         ws.cell(1, 1).string("#").style(cualColumnaEstilo);
-        ws.cell(1, 2).string("Fecha").style(cualColumnaEstilo);
-        ws.cell(1, 3).string("Local").style(cualColumnaEstilo);
-        ws.cell(1, 4).string("Visitante").style(cualColumnaEstilo);
-        ws.cell(1, 5).string("% acierto").style(cualColumnaEstilo);
+        ws.cell(1, 2).string("Competición").style(cualColumnaEstilo);
+        ws.cell(1, 3).string("Fecha").style(cualColumnaEstilo);
+        ws.cell(1, 4).string("Local").style(cualColumnaEstilo);
+        ws.cell(1, 5).string("Visitante").style(cualColumnaEstilo);
         ws.cell(1, 6).string("Pronostico").style(cualColumnaEstilo);
         ws.cell(1, 7).string("Resultado").style(cualColumnaEstilo);
 
@@ -110,83 +121,84 @@ const scrapeData = async () => {
         let n = 0;
         for (let i = 0; i < competitions.length; i++) {
 
-            const tip = competitions[i].children[2].children[1].children[1].children[0].children[0].data;
-            if (tip == "1" || tip == "1X" || tip == "2" || tip == "X2" || tip == "12") {
-                const tipTeam1 = parseInt(competitions[i].children[3].children[0].children[1].children[0].children[0].data);
-                const tipTeam2 = parseInt(competitions[i].children[3].children[0].children[3].children[0].children[0].data);
-                const matchId = competitions[i].attribs.id;
+            const nameCompetition = competitions[i].children.filter(e => e.attribs && e.attribs.class == "header")[0].children.filter(e => e.attribs && e.attribs.class == "name")[0].children[0].data;
+            const matches = competitions[i].children.filter(e => e.attribs && e.attribs.class == "body")[0].children.filter(e => e.attribs && e.attribs.class == "match");
+           
+            for (let j = 0; j < matches.length; j++) {
+                const tip = matches[j].children[2].children[1].children[1].children[0].children[0].data;
+                if (tip == "1" || tip == "1X" || tip == "2" || tip == "X2" || tip == "12") {
+                    const tipTeam1 = parseInt(matches[j].children[3].children[0].children[1].children[0].children[0].data);
+                    const tipTeam2 = parseInt(matches[j].children[3].children[0].children[3].children[0].children[0].data);
+                    const matchId = matches[j].attribs.id;
 
-                let percentTip = 0;
-                if (tipTeam1 >= 59 || tipTeam2 >= 59) {
-                    const rawData = await getRawWithBodyData(URL_MATCH_INFO_BET, matchId);
+                    let percentTip = 0;
+                    if (tipTeam1 >= 59 || tipTeam2 >= 59) {
+                        const rawData = await getRawWithBodyData(URL_MATCH_INFO_BET, matchId);
 
-                    // parsing the data
-                    const parsedData = cheerio.load(rawData);
+                        // parsing the data
+                        const parsedData = cheerio.load(rawData);
 
-                    const infoBet = parsedData("div.halfcontainer");
-                    const betTeam1 = infoBet[0].children[0].children[1].children[0].children[0].data;
-                    const betTeam2 = infoBet[0].children[0].children[3].children[0].children[0].data;
+                        const infoBet = parsedData("div.halfcontainer");
+                        const betTeam1 = infoBet[0].children[0].children[1].children[0].children[0].data;
+                        const betTeam2 = infoBet[0].children[0].children[3].children[0].children[0].data;
 
-                    n++;
+                        n++;
 
-                    if (tipTeam1 >= 59) {
-                        percentTip = tipTeam1;
-                        percentages.push(tipTeam1)
-                    } else {
-                        percentTip = tipTeam2;
-                        percentages.push(tipTeam2);
-                    }
+                        if (tipTeam1 >= 59) {
+                            percentTip = tipTeam1;
+                            percentages.push(tipTeam1)
+                        } else {
+                            percentTip = tipTeam2;
+                            percentages.push(tipTeam2);
+                        }
 
-                    const team1 = competitions[i].children[2].children[2].children[1].children[1].children[0].children[0].data;
-                    const team2 = competitions[i].children[2].children[2].children[2].children.filter(e => e.attribs && e.attribs.class == "name")[0].children[0].children[0].data;
-                    const date = competitions[i].children[1].children[0].data;
-                    const goalsTeam1 = competitions[i].children[2].children[2].children[1].children[0].children[0].data;
-                    const goalsTeam2 = competitions[i].children[2].children[2].children[2].children[0].children[0].data;
-                    const classResultTip = competitions[i].children[2].children[1].children[1].attribs.class;
-                    let resultTip = "NA";
-                    if (classResultTip.indexOf("success") >= 0) {
-                        resultTip = "YES";
-                        countTypeResult.yes += 1;
-                    } else if (classResultTip.indexOf("failed") >= 0) {
-                        resultTip = "NO";
-                        countTypeResult.no += 1;
-                    } else {
-                        countTypeResult.na += 1;
-                    }
-                    const row = `${n} --- ${date} --- ${team1} (${betTeam1}) (${goalsTeam1}) --- ${team2} (${betTeam2}) (${goalsTeam2}) --- ${tip} --- ${percentTip}% --- ${resultTip}`;
-                    console.log(row);
+                        const team1 = matches[j].children[2].children[2].children[1].children[1].children[0].children[0].data;
+                        const team2 = matches[j].children[2].children[2].children[2].children.filter(e => e.attribs && e.attribs.class == "name")[0].children[0].children[0].data;
+                        const date = matches[j].children[1].children[0].data;
+                        const goalsTeam1 = matches[j].children[2].children[2].children[1].children[0].children[0].data;
+                        const goalsTeam2 = matches[j].children[2].children[2].children[2].children[0].children[0].data;
+                        const classResultTip = matches[j].children[2].children[1].children[1].attribs.class;
+                        let resultTip = "NA";
+                        if (classResultTip.indexOf("success") >= 0) {
+                            resultTip = "YES";
+                            countTypeResult.yes += 1;
+                        } else if (classResultTip.indexOf("failed") >= 0) {
+                            resultTip = "NO";
+                            countTypeResult.no += 1;
+                        } else {
+                            countTypeResult.na += 1;
+                        }
+                        const row = `${n} --- ${date} --- ${team1} (${betTeam1}) (${goalsTeam1}) --- ${team2} (${betTeam2}) (${goalsTeam2}) --- ${tip} --- ${percentTip}% --- ${resultTip}`;
+                        console.log(row);
 
-                    // Construcción del excel
-                    // Nombre
-                    ws.cell(lineData, 1).number(n).style(contenidoEstilo);
-                    // apellido
-                    ws.cell(lineData, 2).string((DATE + ' ' + date).toString()).style(contenidoEstilo);
-                    // edad
-                    ws.cell(lineData, 3).string((team1)).style(contenidoEstilo);
-                    // id
-                    ws.cell(lineData, 4).string(team2).style(contenidoEstilo);
-                    // teléfono
-                    ws.cell(lineData, 5).string(percentTip + '%').style(contenidoEstilo);
+                        // Construcción del excel
+                        ws.cell(lineData, 1).number(n).style(contenidoEstilo);
+                        ws.cell(lineData, 2).string(nameCompetition).style(contenidoEstilo);
+                        ws.cell(lineData, 3).string((DATE + ' ' + date).toString()).style(contenidoEstilo);
+                        ws.cell(lineData, 4).string((team1)).style(contenidoEstilo);
+                        ws.cell(lineData, 5).string(team2).style(contenidoEstilo);
 
-                    let tipExcel = tip == '1' ? team1 : team2;
-                    // correo
-                    ws.cell(lineData, 6).string(tipExcel).style(contenidoEstilo);
+                        let tipExcel = tip == '1' ? team1 : team2;
+                        
+                        ws.cell(lineData, 6).string(tipExcel).style(contenidoEstiloTip);
 
-                    let resultTipExcel = 'N/A';
-                    if (resultTip == 'YES') {
-                        resultTipExcel = 'ACERTADO';
-                    } else if (resultTip == 'NO') {
-                        resultTipExcel = 'FALLADO';
-                    }
+                        let resultTipExcel = 'N/A';
+                        if (resultTip == 'YES') {
+                            resultTipExcel = `ACERTADO (${goalsTeam1}-${goalsTeam2})`;
+                        } else if (resultTip == 'NO') {
+                            resultTipExcel = `FALLADO (${goalsTeam1}-${goalsTeam2})`;
+                        }
 
-                    ws.cell(lineData, 7).string(resultTipExcel).style(contenidoEstilo);
+                        ws.cell(lineData, 7).string(resultTipExcel).style(contenidoEstilo);
 
-                    // Aumenta de fila
-                    lineData++;
-                    if (countTypeResult.yes < 4 && resultTip == "YES") {
-                        top3.push(row)
+                        // Aumenta de fila
+                        lineData++;
+                        if (countTypeResult.yes < 4 && resultTip == "YES") {
+                            top3.push(row)
+                        }
                     }
                 }
+                
             }
         }
 
@@ -197,31 +209,40 @@ const scrapeData = async () => {
             console.log("\nEstadísticas de tips:");
             console.log(`    acertados = ${countTypeResult.yes}, perdidos = ${countTypeResult.no}, no iniciados = ${countTypeResult.na}`);
             console.log("Porcentajes de tips:");
-            console.log(`    Mínimo = ${mathArray.min(percentages)}, Máximo = ${mathArray.max(percentages)}, Media = ${mathArray.avg(percentages)}, Acierto = ${success}`);
+            console.log(`    Mínimo = ${mathArray.min(percentages)}, Máximo = ${mathArray.max(percentages)}, Media = ${mathArray.avg(percentages)}, Acierto = ${!isNaN(success) ? success : 0}`);
             console.log("---------------------------------------------------------------");
+
+            ws.cell(lineData+2, 3).string("Acertados").style(cualColumnaEstilo);
+            ws.cell(lineData+3, 3).string((countTypeResult.yes).toString()).style(contenidoEstilo);
+            
+            ws.cell(lineData+4, 3).string("Perdidos").style(cualColumnaEstilo);
+            ws.cell(lineData+5, 3).string((countTypeResult.no).toString()).style(contenidoEstilo);
+
+            ws.cell(lineData+6, 3).string("% Aciertos total").style(cualColumnaEstilo);
+            ws.cell(lineData+7, 3).string(!isNaN(success) ? success.toString() : 'N/A').style(contenidoEstilo);
+
+
+            //Ruta del archivo
+            const pathExcel = path.join(__dirname, 'excel', nombreArchivo + '.xlsx');
+            //Escribir o guardar
+            wb.write(pathExcel, function(err, stats){
+                if(err) console.log(err);
+                else{
+
+                    // Crear función y descargar archivo
+                    function downloadFile(){res.download(pathExcel);}
+                    //downloadFile();
+
+                    // Borrar archivo
+                    /* fs.rm(pathExcel, function(err){
+                        if(err) console.log(err);
+                        else  console.log("Archivo descargado y borrado del servidor correctamente");
+                    }); */
+                }
+            });
         } else {
             console.log("----------- NO EXISTEN JUEGOS CON ALTAS PROBABILIDADES -----------");
         }
-
-        //Ruta del archivo
-        const pathExcel = path.join(__dirname, 'excel', nombreArchivo + '.xlsx');
-        //Escribir o guardar
-        wb.write(pathExcel, function(err, stats){
-            if(err) console.log(err);
-            else{
-
-                // Crear función y descargar archivo
-                function downloadFile(){res.download(pathExcel);}
-                //downloadFile();
-
-                // Borrar archivo
-                /* fs.rm(pathExcel, function(err){
-                    if(err) console.log(err);
-                    else  console.log("Archivo descargado y borrado del servidor correctamente");
-                }); */
-            }
-        });
-
 
     } else {
         console.log("No hay juegos...");
