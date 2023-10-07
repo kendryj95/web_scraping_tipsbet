@@ -4,6 +4,17 @@ const fs = require("fs");
 const moment = require('moment');
 const xl = require('excel4node');
 const path = require('path');
+const yargs = require('yargs');
+
+const argv = yargs
+  .options({
+    'cuota': {
+      describe: 'Consulta las cuotas de los equipos.',
+      type: 'boolean',
+      default: false, // Valor por defecto si no se proporciona
+    },
+  })
+  .argv;
 
 const DATE = process.env.DATE || moment().format("YYYY-MM-DD")
 let today = DATE + '---' + moment().format('YYYY-MM-DD-H-mm-ss');
@@ -133,14 +144,20 @@ const scrapeData = async () => {
 
                     let percentTip = 0;
                     if (tipTeam1 >= 59 || tipTeam2 >= 59) {
-                        const rawData = await getRawWithBodyData(URL_MATCH_INFO_BET, matchId);
+                        
+                        let betTeam1 = 'n/a';
+                        let betTeam2 = 'n/a';
 
-                        // parsing the data
-                        const parsedData = cheerio.load(rawData);
+                        if (argv.cuota === true) {   
+                            const rawData = await getRawWithBodyData(URL_MATCH_INFO_BET, matchId);
 
-                        const infoBet = parsedData("div.halfcontainer");
-                        const betTeam1 = infoBet.length > 0 ? infoBet[0].children[0].children[1].children[0].children[0].data : 'n/a';
-                        const betTeam2 = infoBet.length > 0 ? infoBet[0].children[0].children[3].children[0].children[0].data : 'n/a';
+                            // parsing the data
+                            const parsedData = cheerio.load(rawData);
+
+                            const infoBet = parsedData("div.halfcontainer");
+                            betTeam1 = infoBet.length > 0 ? infoBet[0].children[0].children[1].children[0].children[0].data : 'n/a';
+                            betTeam2 = infoBet.length > 0 ? infoBet[0].children[0].children[3].children[0].children[0].data : 'n/a';
+                        }
 
                         n++;
 
