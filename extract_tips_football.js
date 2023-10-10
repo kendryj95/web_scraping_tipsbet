@@ -94,6 +94,7 @@ const mathArray = {
 // URL for data
 const URL = `http://www.statarea.com/predictions/date/${DATE}/competition`;
 const URL_MATCH_INFO_BET = "http://www.statarea.com/actions/controller";
+const PROBABILITY = 40;
 
 // start of the program
 const scrapeData = async () => {
@@ -137,13 +138,13 @@ const scrapeData = async () => {
            
             for (let j = 0; j < matches.length; j++) {
                 const tip = matches[j].children[2].children[1].children[1].children[0].children[0].data;
-                if (tip == "1" || tip == "1X" || tip == "2" || tip == "X2" || tip == "12") {
+                if (tip == "1" || tip == "1X" || tip == "2" || tip == "X2") {
                     const tipTeam1 = parseInt(matches[j].children[3].children[0].children[1].children[0].children[0].data);
                     const tipTeam2 = parseInt(matches[j].children[3].children[0].children[3].children[0].children[0].data);
                     const matchId = matches[j].attribs.id;
 
                     let percentTip = 0;
-                    if (tipTeam1 >= 59 || tipTeam2 >= 59) {
+                    if (tipTeam1 >= PROBABILITY || tipTeam2 >= PROBABILITY) {
                         
                         let betTeam1 = 'n/a';
                         let betTeam2 = 'n/a';
@@ -161,7 +162,7 @@ const scrapeData = async () => {
 
                         n++;
 
-                        if (tipTeam1 >= 59) {
+                        if (tipTeam1 >= PROBABILITY) {
                             percentTip = tipTeam1;
                             percentages.push(tipTeam1)
                         } else {
@@ -195,7 +196,17 @@ const scrapeData = async () => {
                         ws.cell(lineData, 4).string((team1)).style(contenidoEstilo);
                         ws.cell(lineData, 5).string(team2).style(contenidoEstilo);
 
-                        let tipExcel = tip == '1' ? team1 : team2;
+                        let tipExcel = '';
+
+                        if (tip == '1') {
+                            tipExcel = team1 + " a ganar";
+                        } else if (tip == '1X') {
+                            tipExcel = team1 + " a ganar o empate";
+                        } else if (tip == '2') {
+                            tipExcel = team2 + " a ganar";
+                        } else if (tip == 'X2') {
+                            tipExcel = team2 + " a ganar o empate";
+                        }
                         
                         ws.cell(lineData, 6).string(tipExcel).style(contenidoEstiloTip);
 
